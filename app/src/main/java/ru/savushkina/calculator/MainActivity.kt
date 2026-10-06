@@ -7,7 +7,12 @@ import android.widget.EditText
 import android.widget.Spinner
 import android.widget.TextView
 import android.widget.Toast
+import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
+import kotlinx.coroutines.launch
 
 /**
  * MainActivity - главный и единственный экран приложения
@@ -21,13 +26,27 @@ class MainActivity : AppCompatActivity() {
      * позволяет не делать тип nullable
      * Если обратиться до инициализации - UninitializedPropertyAccessException.
     */
-    lateinit var firstNumber: EditText
-    lateinit var secondNumber: EditText
-    lateinit var operationsSpinner: Spinner
-    lateinit var btnCalculate: Button
-    lateinit var result: TextView
+    private lateinit var firstNumber: EditText
+    private lateinit var secondNumber: EditText
+    private lateinit var operationsSpinner: Spinner
+    private lateinit var btnCalculate: Button
+    private lateinit var result: TextView
 
-    val operations = listOf("+", "-", "/", "*")
+    /**
+     * by ViewModels() - делегат для получения ViewModel
+     *
+     * Что делает:
+     *  - создает ViewModel при первом обращении
+     *  - при пересоздании Activity возвращает ТУ ЖЕ ViewModel (потому что ViewModel хранится в ViewModelStore, который переживает пересоздание)
+     *  - привязывает ViewModel к lifecycle Activity:
+     *   когда Activity уничтожается окончательно (не поворот), вызывается onCleared() у ViewModel
+     *
+     * Почему by viewModels():
+     *  - не нужно вручную создавать ViewModelProvider
+     *  - тип выводится автоматически (CalculatorViewModel)
+     *  - безопасно: если ViewModel уже есть - вернется она
+     */
+    private val viewModel: CalculatorViewModel by viewModels()
 
     /**
      * onCreate - точка входа Activity
@@ -57,10 +76,42 @@ class MainActivity : AppCompatActivity() {
         val adapter = ArrayAdapter(
             this,
             android.R.layout.simple_spinner_dropdown_item,
-            operations)
+            viewModel.operations)
         operationsSpinner.adapter = adapter
 
         setupClickListener()
+
+        /**
+         * Подписка на uiState
+         *
+         * Как это работает:
+         *  1) lifecycleScope.launch - корутина, привязанная к Activity
+         *  Отменяется при onDestroy
+         *
+         *  2) repeatOnLifecycle(STARTED) - блок выполняется, пока Activity в состоянии STARTED или выше
+         *  При onStop - отписка, при onStart - снова подписка
+         *
+         *  3) viewModel.uiState.collect { state -> ... } - сбор значений
+         *  collect вызывается при КАЖДОМ обновлении _uiState
+         *
+         * Зачем repeatOnLifecycle:
+         *  - без него collect работал бы даже когда Activity невидима, расходуя ресурсы
+         *  - при повороте подписка корректно пересоздается
+         *  - при onStop - не тратим батарею
+         *
+         *  state - это снимок состояния на момент вызова collect
+         */
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                viewModel.uiState.collect { state ->
+                    result.text = state.resultText
+                    if (state.error != null){
+                        Toast.makeText(this@MainActivity, state.error, Toast.LENGTH_LONG).show()
+                        viewModel.clearError()
+                    }
+                }
+            }
+        }
 
     }
 
@@ -76,34 +127,14 @@ class MainActivity : AppCompatActivity() {
              * - если получилось - Double
              * - если не получилось (пусто, буквы) - null
              */
-            val first = firstNumber.text.toString().toDoubleOrNull()
-            val second = secondNumber.text.toString().toDoubleOrNull()
-
+            val first = firstNumber.text.toString()
+            val second = secondNumber.text.toString()
             /**
              * selectedItem - текущий выбранный элемент Spinner (Any)
              */
             val op = operationsSpinner.selectedItem.toString()
 
-            if (first == null || second == null) {
-                result.text = getString(R.string.result_empty)
-                Toast.makeText(this, "Введите оба числа", Toast.LENGTH_LONG).show()
-                return@setOnClickListener
-            }
-            if (op == "/" && second == 0.0) {
-                result.text = getString(R.string.result_empty)
-                Toast.makeText(this, "Нельзя делить на ноль", Toast.LENGTH_LONG).show()
-                return@setOnClickListener
-            }
-            val computed = when (op) {
-                "+" -> first + second
-                "-" -> first - second
-                "/" -> first / second
-                "*" -> first * second
-                else -> null
-            }
-            result.text = getString(R.string.result, computed.toString())
-
-
+            viewModel.onCalculateClick(first, second, op)
         }
     }
 

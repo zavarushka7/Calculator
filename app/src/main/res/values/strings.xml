@@ -4,5 +4,5 @@
     <string name="second_number">Второе число</string>
     <string name="calculate">Вычислить</string>
     <string name="result">Результат: %1$s</string>
-    <string name="result_empty">Результат: —</string>
+    <string name="result_empty">Результат: -</string>
 </resources>

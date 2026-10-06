@@ -40,5 +40,6 @@ dependencies {
     androidTestImplementation(libs.androidx.junit)
     implementation(libs.material)
     implementation(libs.androidx.constraintlayout)
+    implementation(libs.androidx.lifecycle.viewmodel.ktx)
 
 }

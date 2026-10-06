@@ -1,9 +1,6 @@
 package ru.savushkina.calculator
 
-import android.annotation.SuppressLint
 import android.os.Bundle
-import android.view.View
-import android.widget.AdapterView
 import android.widget.ArrayAdapter
 import android.widget.Button
 import android.widget.EditText
@@ -20,8 +17,6 @@ class MainActivity : AppCompatActivity() {
     lateinit var result: TextView
 
     val operations = listOf("+", "-", "/", "*")
-    lateinit var op: String
-    var res: Double? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -34,48 +29,42 @@ class MainActivity : AppCompatActivity() {
         result = findViewById(R.id.result)
 
 
-        // считать два числа
-        // считать операцию
-        val adapter = ArrayAdapter(this, android.R.layout.simple_spinner_item, operations)
+        val adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, operations)
         operationsSpinner.adapter = adapter
-        operationsSpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
-            override fun onItemSelected(
-                parent: AdapterView<*>?,
-                view: View?,
-                position: Int,
-                id: Long
-            ) {
-                op = operations[position]
-            }
 
-            override fun onNothingSelected(parent: AdapterView<*>?) {
+        calculate()
 
-            }
-        }
-        // определить кнопку, вычислить
+
+    }
+
+    private fun calculate() {
         btnCalculate.setOnClickListener {
-            val first = firstNumber.text.toString().toDouble()
-            val second = secondNumber.text.toString().toDouble()
-            if (op == "/" && second == 0.0){
-                Toast.makeText(this, "Нельзя делить на ноль", Toast.LENGTH_LONG ).show()
+            val first = firstNumber.text.toString().toDoubleOrNull()
+            val second = secondNumber.text.toString().toDoubleOrNull()
+            val op = operationsSpinner.selectedItem.toString()
+
+            if (first == null || second == null) {
+                result.text = getString(R.string.result_empty)
+                Toast.makeText(this, "Введите оба числа", Toast.LENGTH_LONG).show()
                 return@setOnClickListener
             }
-            res = when (op) {
+            if (op == "/" && second == 0.0) {
+                result.text = getString(R.string.result_empty)
+                Toast.makeText(this, "Нельзя делить на ноль", Toast.LENGTH_LONG).show()
+                return@setOnClickListener
+            }
+            val computed = when (op) {
                 "+" -> first + second
                 "-" -> first - second
                 "/" -> first / second
                 "*" -> first * second
                 else -> null
             }
-            // показать результат или ошибку
-            result.text = res.toString()
+            result.text = getString(R.string.result, computed.toString())
+
+
         }
-
-
     }
-
-
-
 
 }
 
